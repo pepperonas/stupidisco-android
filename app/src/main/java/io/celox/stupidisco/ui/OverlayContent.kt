@@ -1,9 +1,5 @@
 package io.celox.stupidisco.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -13,6 +9,9 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,8 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -50,9 +48,13 @@ import io.celox.stupidisco.model.AppStatus
 @Composable
 fun OverlayContent(
     state: AppState,
+    answerAreaHeightDp: Int = 120,
     onMicClick: () -> Unit,
     onCopy: () -> Unit,
-    onRegenerate: () -> Unit
+    onRegenerate: () -> Unit,
+    onClose: () -> Unit = {},
+    onDrag: (Float, Float) -> Unit = { _, _ -> },
+    onResize: (Float) -> Unit = {}
 ) {
     val shape = RoundedCornerShape(12.dp)
 
@@ -64,8 +66,12 @@ fun OverlayContent(
             .border(1.dp, AppColors.Border, shape)
             .padding(12.dp)
     ) {
-        // Title bar
-        TitleBar(state.status)
+        // Title bar (drag handle + close)
+        TitleBar(
+            status = state.status,
+            onClose = onClose,
+            onDrag = onDrag
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -91,7 +97,8 @@ fun OverlayContent(
         if (state.answer.isNotBlank() || state.status is AppStatus.Thinking) {
             AnswerArea(
                 answer = state.answer,
-                isThinking = state.status is AppStatus.Thinking && state.answer.isBlank()
+                isThinking = state.status is AppStatus.Thinking && state.answer.isBlank(),
+                heightDp = answerAreaHeightDp
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -120,45 +127,76 @@ fun OverlayContent(
 
         // Footer
         Footer(questionCount = state.questionCount)
+
+        // Resize handle
+        ResizeHandle(onResize = onResize)
     }
 }
 
 @Composable
-private fun TitleBar(status: AppStatus) {
+private fun TitleBar(
+    status: AppStatus,
+    onClose: () -> Unit,
+    onDrag: (Float, Float) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "stupidisco",
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            color = AppColors.TextPrimary
+        // Close button (red dot, macOS-style)
+        Box(
+            modifier = Modifier
+                .size(16.dp)
+                .clip(CircleShape)
+                .background(AppColors.Recording)
+                .clickable { onClose() }
         )
 
-        val (statusText, statusColor) = when (status) {
-            is AppStatus.Ready -> "ready" to AppColors.Ready
-            is AppStatus.Recording -> "recording" to AppColors.Recording
-            is AppStatus.Thinking -> "thinking" to AppColors.Thinking
-            is AppStatus.Error -> "error" to AppColors.Recording
-        }
+        Spacer(modifier = Modifier.width(8.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(statusColor)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
+        // Drag area (title + status)
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        onDrag(dragAmount.x, dragAmount.y)
+                    }
+                },
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = statusText,
+                text = "stupidisco",
                 fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                color = statusColor
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = AppColors.TextPrimary
             )
+
+            val (statusText, statusColor) = when (status) {
+                is AppStatus.Ready -> "ready" to AppColors.Ready
+                is AppStatus.Recording -> "recording" to AppColors.Recording
+                is AppStatus.Thinking -> "thinking" to AppColors.Thinking
+                is AppStatus.Error -> "error" to AppColors.Recording
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = statusText,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = statusColor
+                )
+            }
         }
     }
 }
@@ -258,13 +296,13 @@ private fun TranscriptArea(finalTranscript: String, partialTranscript: String) {
 }
 
 @Composable
-private fun AnswerArea(answer: String, isThinking: Boolean) {
+private fun AnswerArea(answer: String, isThinking: Boolean, heightDp: Int) {
     val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(heightDp.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(AppColors.Surface)
             .border(1.dp, AppColors.Border, RoundedCornerShape(8.dp))
@@ -353,7 +391,7 @@ private fun Footer(questionCount: Int) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "v1.0.0 | celox.io",
+            text = "v1.1.0 | celox.io",
             fontFamily = FontFamily.Monospace,
             fontSize = 9.sp,
             color = AppColors.TextSecondary
@@ -366,5 +404,28 @@ private fun Footer(questionCount: Int) {
                 color = AppColors.TextSecondary
             )
         }
+    }
+}
+
+@Composable
+private fun ResizeHandle(onResize: (Float) -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(16.dp)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, dragAmount ->
+                    onResize(dragAmount)
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(40.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(AppColors.Border)
+        )
     }
 }

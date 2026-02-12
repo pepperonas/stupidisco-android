@@ -5,16 +5,16 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.pm.ServiceInfo
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.view.Gravity
-import android.view.MotionEvent
-import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.runtime.collectAsState
@@ -51,15 +51,20 @@ class OverlayService : Service() {
         private const val TAG = "OverlayService"
         private const val CHANNEL_ID = "stupidisco_overlay"
         private const val NOTIFICATION_ID = 1
+        private const val MIN_ANSWER_HEIGHT_DP = 60
+        private const val MAX_ANSWER_HEIGHT_DP = 400
+        private const val DEFAULT_ANSWER_HEIGHT_DP = 120
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val state = MutableStateFlow(AppState())
+    private val answerAreaHeightDp = MutableStateFlow(DEFAULT_ANSWER_HEIGHT_DP)
 
     private lateinit var windowManager: WindowManager
     private lateinit var apiKeyStore: ApiKeyStore
     private lateinit var sessionLogger: SessionLogger
     private var overlayView: ComposeView? = null
+    private var overlayParams: WindowManager.LayoutParams? = null
 
     private var audioRecorder: AudioRecorder? = null
     private var deepgramClient: DeepgramClient? = null
@@ -79,7 +84,17 @@ class OverlayService : Service() {
         claudeClient = ClaudeClient(apiKeyStore.getAnthropicKey())
 
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification())
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification())
+        }
+
         showOverlay()
     }
 
@@ -134,6 +149,9 @@ class OverlayService : Service() {
             x = 50
             y = 200
         }
+        overlayParams = params
+
+        val density = resources.displayMetrics.density
 
         val lifecycleOwner = OverlayLifecycleOwner()
 
@@ -143,12 +161,33 @@ class OverlayService : Service() {
 
             setContent {
                 val currentState by state.collectAsState()
+                val answerHeight by answerAreaHeightDp.collectAsState()
                 StupidiscoTheme {
                     OverlayContent(
                         state = currentState,
+                        answerAreaHeightDp = answerHeight,
                         onMicClick = { onMicButtonClicked() },
                         onCopy = { copyAnswer() },
-                        onRegenerate = { regenerateAnswer() }
+                        onRegenerate = { regenerateAnswer() },
+                        onClose = { stopSelf() },
+                        onDrag = { dx, dy ->
+                            params.x += dx.toInt()
+                            params.y += dy.toInt()
+                            try {
+                                windowManager.updateViewLayout(
+                                    overlayView, params
+                                )
+                            } catch (_: Exception) {}
+                        },
+                        onResize = { deltaY ->
+                            val deltaDp = (deltaY / density).toInt()
+                            answerAreaHeightDp.update {
+                                (it + deltaDp).coerceIn(
+                                    MIN_ANSWER_HEIGHT_DP,
+                                    MAX_ANSWER_HEIGHT_DP
+                                )
+                            }
+                        }
                     )
                 }
             }
@@ -157,43 +196,6 @@ class OverlayService : Service() {
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-
-        // Drag logic
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-        var isDragging = false
-
-        composeView.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    isDragging = false
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX - initialTouchX
-                    val dy = event.rawY - initialTouchY
-                    if (!isDragging && (dx * dx + dy * dy > 100)) {
-                        isDragging = true
-                    }
-                    if (isDragging) {
-                        params.x = initialX + dx.toInt()
-                        params.y = initialY + dy.toInt()
-                        windowManager.updateViewLayout(composeView, params)
-                    }
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    isDragging
-                }
-                else -> false
-            }
-        }
 
         overlayView = composeView
         windowManager.addView(composeView, params)
