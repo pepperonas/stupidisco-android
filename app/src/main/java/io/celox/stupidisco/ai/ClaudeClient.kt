@@ -1,0 +1,142 @@
+package io.celox.stupidisco.ai
+
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+
+class ClaudeClient(private val apiKey: String) {
+    companion object {
+        private const val TAG = "ClaudeClient"
+        private const val API_URL = "https://api.anthropic.com/v1/messages"
+        private const val MODEL = "claude-sonnet-4-5-20250929"
+        private const val MAX_TOKENS = 600
+        private val SYSTEM_PROMPT = """
+            Du bist ein Interview-Assistent. Du hilfst dem Benutzer, Fragen in einem Interview oder Meeting zu beantworten.
+
+            Regeln:
+            - Antworte DIREKT auf die gestellte Frage, als wärst du der Interviewte
+            - Halte deine Antworten kurz und prägnant (2-4 Sätze)
+            - Verwende einen professionellen aber natürlichen Ton
+            - Antworte auf Deutsch, es sei denn, die Frage ist auf Englisch
+            - Keine Einleitungen wie "Hier ist meine Antwort" - antworte direkt
+            - Wenn der Kontext unklar ist, gib trotzdem eine hilfreiche Antwort
+        """.trimIndent()
+    }
+
+    private val client = OkHttpClient.Builder()
+        .readTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    suspend fun streamAnswer(
+        question: String,
+        onToken: (String) -> Unit,
+        onComplete: () -> Unit,
+        onError: (String) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val body = JSONObject().apply {
+                put("model", MODEL)
+                put("max_tokens", MAX_TOKENS)
+                put("stream", true)
+                put("system", SYSTEM_PROMPT)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", question)
+                    })
+                })
+            }
+
+            val request = Request.Builder()
+                .url(API_URL)
+                .addHeader("x-api-key", apiKey)
+                .addHeader("anthropic-version", "2023-06-01")
+                .addHeader("Content-Type", "application/json")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = client.newCall(request).execute()
+
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string() ?: "Unknown error"
+                onError("Claude API error ${response.code}: $errorBody")
+                return@withContext
+            }
+
+            val reader = response.body?.byteStream()?.bufferedReader()
+            if (reader == null) {
+                onError("Empty response from Claude")
+                return@withContext
+            }
+
+            parseSSE(reader, onToken, onComplete, onError)
+        } catch (e: Exception) {
+            Log.e(TAG, "Stream error", e)
+            onError("Claude error: ${e.message}")
+        }
+    }
+
+    private fun parseSSE(
+        reader: BufferedReader,
+        onToken: (String) -> Unit,
+        onComplete: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        var currentEvent = ""
+
+        reader.useLines { lines ->
+            for (line in lines) {
+                when {
+                    line.startsWith("event: ") -> {
+                        currentEvent = line.removePrefix("event: ").trim()
+                    }
+                    line.startsWith("data: ") -> {
+                        val data = line.removePrefix("data: ").trim()
+                        when (currentEvent) {
+                            "content_block_delta" -> {
+                                try {
+                                    val json = JSONObject(data)
+                                    val delta = json.optJSONObject("delta")
+                                    val text = delta?.optString("text", "") ?: ""
+                                    if (text.isNotEmpty()) {
+                                        onToken(text)
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error parsing delta", e)
+                                }
+                            }
+                            "message_stop" -> {
+                                onComplete()
+                                return
+                            }
+                            "error" -> {
+                                try {
+                                    val json = JSONObject(data)
+                                    val error = json.optJSONObject("error")
+                                    val msg = error?.optString("message", "Unknown error")
+                                    onError("Claude: $msg")
+                                } catch (_: Exception) {
+                                    onError("Claude stream error")
+                                }
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // If we get here without message_stop, still complete
+        onComplete()
+    }
+}
