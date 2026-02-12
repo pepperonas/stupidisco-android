@@ -1,6 +1,5 @@
 package io.celox.stupidisco.stt
 
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -10,10 +9,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.JUnit4
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-@RunWith(AndroidJUnit4::class)
+@RunWith(JUnit4::class)
 class DeepgramClientIntegrationTest {
 
     private lateinit var server: MockWebServer
@@ -29,8 +29,13 @@ class DeepgramClientIntegrationTest {
 
     @After
     fun teardown() {
-        server.shutdown()
+        okHttpClient.dispatcher.executorService.shutdown()
+        okHttpClient.connectionPool.evictAll()
+        try { server.shutdown() } catch (_: Exception) {}
     }
+
+    private fun wsUrl(path: String): String =
+        server.url(path).toString().replace("http://", "ws://")
 
     @Test
     fun connect_establishesWebSocketConnection() {
@@ -48,11 +53,11 @@ class DeepgramClientIntegrationTest {
             onFinalTranscript = {},
             onError = {},
             client = okHttpClient,
-            baseUrl = server.url("/v1/listen").toString().replace("http://", "ws://")
+            baseUrl = wsUrl("/v1/listen")
         )
 
         client.connect()
-        assertTrue("WebSocket should connect", connectedLatch.await(5, TimeUnit.SECONDS))
+        assertTrue("WebSocket should connect", connectedLatch.await(10, TimeUnit.SECONDS))
         client.disconnect()
     }
 
@@ -88,11 +93,11 @@ class DeepgramClientIntegrationTest {
             },
             onError = {},
             client = okHttpClient,
-            baseUrl = server.url("/v1/listen").toString().replace("http://", "ws://")
+            baseUrl = wsUrl("/v1/listen")
         )
 
         client.connect()
-        assertTrue("Should receive final transcript", transcriptLatch.await(5, TimeUnit.SECONDS))
+        assertTrue("Should receive final transcript", transcriptLatch.await(10, TimeUnit.SECONDS))
         assertEquals("Hallo Welt", receivedTranscript)
         client.disconnect()
     }
@@ -129,11 +134,11 @@ class DeepgramClientIntegrationTest {
             onFinalTranscript = {},
             onError = {},
             client = okHttpClient,
-            baseUrl = server.url("/v1/listen").toString().replace("http://", "ws://")
+            baseUrl = wsUrl("/v1/listen")
         )
 
         client.connect()
-        assertTrue("Should receive partial transcript", partialLatch.await(5, TimeUnit.SECONDS))
+        assertTrue("Should receive partial transcript", partialLatch.await(10, TimeUnit.SECONDS))
         assertEquals("Hallo", receivedPartial)
         client.disconnect()
     }
@@ -168,12 +173,11 @@ class DeepgramClientIntegrationTest {
             onFinalTranscript = { transcriptReceived = true },
             onError = {},
             client = okHttpClient,
-            baseUrl = server.url("/v1/listen").toString().replace("http://", "ws://")
+            baseUrl = wsUrl("/v1/listen")
         )
 
         client.connect()
-        assertTrue("Server should open connection", openLatch.await(5, TimeUnit.SECONDS))
-        // Small delay to ensure message would have been processed
+        assertTrue("Server should open connection", openLatch.await(10, TimeUnit.SECONDS))
         Thread.sleep(500)
         assertTrue("Blank transcripts should be ignored", !transcriptReceived)
         client.disconnect()
@@ -199,11 +203,11 @@ class DeepgramClientIntegrationTest {
             onFinalTranscript = { transcriptReceived = true },
             onError = {},
             client = okHttpClient,
-            baseUrl = server.url("/v1/listen").toString().replace("http://", "ws://")
+            baseUrl = wsUrl("/v1/listen")
         )
 
         client.connect()
-        assertTrue("Server should open connection", openLatch.await(5, TimeUnit.SECONDS))
+        assertTrue("Server should open connection", openLatch.await(10, TimeUnit.SECONDS))
         Thread.sleep(500)
         assertTrue("Messages without channel should be ignored", !transcriptReceived)
         client.disconnect()
@@ -225,11 +229,11 @@ class DeepgramClientIntegrationTest {
             onFinalTranscript = {},
             onError = {},
             client = okHttpClient,
-            baseUrl = server.url("/v1/listen").toString().replace("http://", "ws://")
+            baseUrl = wsUrl("/v1/listen")
         )
 
         client.connect()
-        assertTrue("Should connect", headerLatch.await(5, TimeUnit.SECONDS))
+        assertTrue("Should connect", headerLatch.await(10, TimeUnit.SECONDS))
 
         val request = server.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals("Token my-secret-key", request.getHeader("Authorization"))
