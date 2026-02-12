@@ -9,7 +9,7 @@ import java.util.Locale
 class SessionLogger(context: Context) {
     private val sessionDir = File(context.filesDir, "sessions").also { it.mkdirs() }
     private val sessionFile: File
-    private val startTime: Long = System.currentTimeMillis()
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     init {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault())
@@ -17,25 +17,20 @@ class SessionLogger(context: Context) {
     }
 
     fun logQA(questionNumber: Int, question: String, answer: String) {
-        val elapsed = (System.currentTimeMillis() - startTime) / 1000
-        val hours = elapsed / 3600
-        val minutes = (elapsed % 3600) / 60
-        val seconds = elapsed % 60
-        val timestamp = String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
+        val timestamp = timeFormat.format(Date())
+        val separator = "=".repeat(60)
 
         val entry = buildString {
-            if (sessionFile.exists() && sessionFile.length() > 0) {
-                appendLine()
-                appendLine("====================================")
-                appendLine()
-            }
-            appendLine("#$questionNumber  $timestamp")
             appendLine()
+            appendLine(separator)
+            appendLine("#$questionNumber  $timestamp")
+            appendLine(separator)
             appendLine("FRAGE:")
             appendLine(question)
             appendLine()
             appendLine("ANTWORT:")
-            appendLine(answer)
+            append(answer)
+            appendLine()
         }
 
         sessionFile.appendText(entry)

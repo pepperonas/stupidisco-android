@@ -1,6 +1,5 @@
 package io.celox.stupidisco.data
 
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -19,6 +18,8 @@ class SessionLoggerFormatTest {
 
     private lateinit var sessionFile: File
 
+    private val separator = "=".repeat(60)
+
     @Before
     fun setup() {
         sessionFile = File(tempFolder.root, "test-session.txt")
@@ -29,59 +30,44 @@ class SessionLoggerFormatTest {
         questionNumber: Int,
         question: String,
         answer: String,
-        elapsedSeconds: Long,
-        fileExistsAndNotEmpty: Boolean
+        timestamp: String
     ): String {
-        val hours = elapsedSeconds / 3600
-        val minutes = (elapsedSeconds % 3600) / 60
-        val seconds = elapsedSeconds % 60
-        val timestamp = String.format(java.util.Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
-
         return buildString {
-            if (fileExistsAndNotEmpty) {
-                appendLine()
-                appendLine("====================================")
-                appendLine()
-            }
-            appendLine("#$questionNumber  $timestamp")
             appendLine()
+            appendLine(separator)
+            appendLine("#$questionNumber  $timestamp")
+            appendLine(separator)
             appendLine("FRAGE:")
             appendLine(question)
             appendLine()
             appendLine("ANTWORT:")
-            appendLine(answer)
+            append(answer)
+            appendLine()
         }
     }
 
     @Test
-    fun `first entry has no separator`() {
-        val entry = formatEntry(1, "Was ist Kotlin?", "Eine Programmiersprache.", 5, false)
-        assertFalse(entry.contains("===================================="))
-        assertTrue(entry.startsWith("#1  00:00:05"))
+    fun `every entry has separator`() {
+        val entry = formatEntry(1, "Was ist Kotlin?", "Eine Programmiersprache.", "12:00:05")
+        assertTrue(entry.contains(separator))
+        assertTrue(entry.contains("#1  12:00:05"))
     }
 
     @Test
-    fun `second entry has separator`() {
-        val entry = formatEntry(2, "Und Java?", "Auch eine Sprache.", 65, true)
-        assertTrue(entry.contains("===================================="))
-        assertTrue(entry.contains("#2  00:01:05"))
+    fun `separator is 60 equals signs`() {
+        val entry = formatEntry(1, "Q", "A", "00:00:00")
+        assertTrue(entry.contains("=" .repeat(60)))
     }
 
     @Test
     fun `question numbering is correct`() {
-        val entry = formatEntry(42, "Frage", "Antwort", 0, false)
-        assertTrue(entry.contains("#42  00:00:00"))
-    }
-
-    @Test
-    fun `timestamp format for hours`() {
-        val entry = formatEntry(1, "Q", "A", 3661, false) // 1h 1m 1s
-        assertTrue(entry.contains("01:01:01"))
+        val entry = formatEntry(42, "Frage", "Antwort", "14:30:00")
+        assertTrue(entry.contains("#42  14:30:00"))
     }
 
     @Test
     fun `entry contains FRAGE and ANTWORT blocks`() {
-        val entry = formatEntry(1, "Meine Frage", "Meine Antwort", 0, false)
+        val entry = formatEntry(1, "Meine Frage", "Meine Antwort", "10:00:00")
         assertTrue(entry.contains("FRAGE:"))
         assertTrue(entry.contains("Meine Frage"))
         assertTrue(entry.contains("ANTWORT:"))
@@ -89,28 +75,39 @@ class SessionLoggerFormatTest {
     }
 
     @Test
-    fun `full session with multiple entries`() {
-        // Simulate writing two entries
-        val entry1 = formatEntry(1, "Frage 1", "Antwort 1", 5, false)
+    fun `separator appears before each entry`() {
+        val entry1 = formatEntry(1, "Frage 1", "Antwort 1", "10:00:05")
         sessionFile.appendText(entry1)
 
-        val entry2 = formatEntry(2, "Frage 2", "Antwort 2", 70, true)
+        val entry2 = formatEntry(2, "Frage 2", "Antwort 2", "10:01:10")
         sessionFile.appendText(entry2)
 
         val content = sessionFile.readText()
-        assertTrue(content.contains("#1  00:00:05"))
-        assertTrue(content.contains("#2  00:01:10"))
-        // Separator should appear exactly once (between entries)
-        val separatorCount = content.split("====================================").size - 1
-        assertTrue("Expected 1 separator, got $separatorCount", separatorCount == 1)
+        assertTrue(content.contains("#1  10:00:05"))
+        assertTrue(content.contains("#2  10:01:10"))
+        // Separator appears 4 times (2 per entry: above and below header)
+        val separatorCount = content.split(separator).size - 1
+        assertTrue("Expected 4 separators, got $separatorCount", separatorCount == 4)
     }
 
     @Test
     fun `multiline question and answer preserved`() {
         val question = "Line 1\nLine 2\nLine 3"
         val answer = "Answer line 1\nAnswer line 2"
-        val entry = formatEntry(1, question, answer, 0, false)
+        val entry = formatEntry(1, question, answer, "09:00:00")
         assertTrue(entry.contains("Line 1\nLine 2\nLine 3"))
         assertTrue(entry.contains("Answer line 1\nAnswer line 2"))
+    }
+
+    @Test
+    fun `format matches Python version structure`() {
+        val entry = formatEntry(1, "Was ist REST?", "REST ist ein Architekturstil.", "15:30:00")
+        // Python format: \n separator \n #N  HH:MM:SS \n separator \n FRAGE: \n ... \n\n ANTWORT: \n ...
+        val lines = entry.lines()
+        assertTrue("First line should be empty", lines[0].isEmpty())
+        assertTrue("Second line should be separator", lines[1] == separator)
+        assertTrue("Third line should be entry header", lines[2].startsWith("#1  "))
+        assertTrue("Fourth line should be separator", lines[3] == separator)
+        assertTrue("Fifth line should be FRAGE:", lines[4] == "FRAGE:")
     }
 }
