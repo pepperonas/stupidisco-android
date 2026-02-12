@@ -15,7 +15,11 @@ class DeepgramClient(
     private val apiKey: String,
     private val onPartialTranscript: (String) -> Unit,
     private val onFinalTranscript: (String) -> Unit,
-    private val onError: (String) -> Unit
+    private val onError: (String) -> Unit,
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .build(),
+    private val baseUrl: String = DEEPGRAM_URL
 ) {
     companion object {
         private const val TAG = "DeepgramClient"
@@ -31,13 +35,10 @@ class DeepgramClient(
     }
 
     private var webSocket: WebSocket? = null
-    private val client = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.MILLISECONDS)
-        .build()
 
     fun connect() {
         val request = Request.Builder()
-            .url(DEEPGRAM_URL)
+            .url(baseUrl)
             .addHeader("Authorization", "Token $apiKey")
             .build()
 

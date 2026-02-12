@@ -14,7 +14,14 @@ import java.io.BufferedReader
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
-class ClaudeClient(private val apiKey: String) {
+class ClaudeClient(
+    private val apiKey: String,
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .readTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .build(),
+    private val baseUrl: String = API_URL
+) {
     companion object {
         private const val TAG = "ClaudeClient"
         private const val API_URL = "https://api.anthropic.com/v1/messages"
@@ -32,11 +39,6 @@ class ClaudeClient(private val apiKey: String) {
             - Wenn der Kontext unklar ist, gib trotzdem eine hilfreiche Antwort
         """.trimIndent()
     }
-
-    private val client = OkHttpClient.Builder()
-        .readTimeout(60, TimeUnit.SECONDS)
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .build()
 
     suspend fun streamAnswer(
         question: String,
@@ -59,7 +61,7 @@ class ClaudeClient(private val apiKey: String) {
             }
 
             val request = Request.Builder()
-                .url(API_URL)
+                .url(baseUrl)
                 .addHeader("x-api-key", apiKey)
                 .addHeader("anthropic-version", "2023-06-01")
                 .addHeader("Content-Type", "application/json")
