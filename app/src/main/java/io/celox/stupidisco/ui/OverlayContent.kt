@@ -39,9 +39,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.jeziellago.compose.markdowntext.MarkdownText
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.TextView
+import io.noties.markwon.AbstractMarkwonPlugin
+import io.noties.markwon.Markwon
+import io.noties.markwon.core.MarkwonTheme
 import io.celox.stupidisco.R
 import io.celox.stupidisco.model.AppState
 import io.celox.stupidisco.model.AppStatus
@@ -326,14 +331,7 @@ private fun AnswerArea(answer: String, isThinking: Boolean, heightDp: Int) {
                 fontFamily = FontFamily.Monospace
             )
         } else {
-            MarkdownText(
-                markdown = answer,
-                style = androidx.compose.ui.text.TextStyle(
-                    color = AppColors.Answer,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-            )
+            ThemedMarkdownText(markdown = answer)
         }
     }
 }
@@ -394,7 +392,7 @@ private fun Footer(questionCount: Int) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "v1.2.0 | celox.io",
+            text = "v1.2.1 | celox.io",
             fontFamily = FontFamily.Monospace,
             fontSize = 9.sp,
             color = AppColors.TextSecondary
@@ -431,4 +429,42 @@ private fun ResizeHandle(onResize: (Float) -> Unit) {
                 .background(AppColors.Border)
         )
     }
+}
+
+@Composable
+private fun ThemedMarkdownText(
+    markdown: String,
+    modifier: Modifier = Modifier
+) {
+    val answerColor = AppColors.Answer.toArgb()
+    val codeTextColor = AppColors.TextPrimary.toArgb()
+    val codeBgColor = AppColors.Background.toArgb()
+
+    AndroidView(
+        modifier = modifier.fillMaxWidth(),
+        factory = { context ->
+            val markwon = Markwon.builder(context)
+                .usePlugin(object : AbstractMarkwonPlugin() {
+                    override fun configureTheme(builder: MarkwonTheme.Builder) {
+                        builder
+                            .codeTextColor(codeTextColor)
+                            .codeBackgroundColor(codeBgColor)
+                            .codeBlockTextColor(codeTextColor)
+                            .codeBlockBackgroundColor(codeBgColor)
+                    }
+                })
+                .build()
+
+            TextView(context).apply {
+                setTextColor(answerColor)
+                textSize = 13f
+                setLineSpacing(0f, 1.38f)
+                tag = markwon
+                markwon.setMarkdown(this, markdown)
+            }
+        },
+        update = { textView ->
+            (textView.tag as? Markwon)?.setMarkdown(textView, markdown)
+        }
+    )
 }

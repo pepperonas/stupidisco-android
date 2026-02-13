@@ -11,8 +11,8 @@ android {
         applicationId = "io.celox.stupidisco"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -102,7 +102,7 @@ dependencies {
     implementation("org.json:json:20231013")
 
     // Markdown rendering
-    implementation("com.github.jeziellago:compose-markdown:0.5.5")
+    implementation("io.noties.markwon:core:4.6.2")
 
     // Unit Tests
     testImplementation("junit:junit:4.13.2")
