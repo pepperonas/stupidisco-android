@@ -392,7 +392,7 @@ private fun Footer(questionCount: Int) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "v1.3.0 | celox.io",
+            text = "v1.3.1 | celox.io",
             fontFamily = FontFamily.Monospace,
             fontSize = 9.sp,
             color = AppColors.TextSecondary
