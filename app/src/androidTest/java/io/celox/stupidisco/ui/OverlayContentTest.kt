@@ -125,7 +125,7 @@ class OverlayContentTest {
     @Test
     fun showsVersionInfo() {
         setContent(AppState())
-        composeRule.onNodeWithText("v1.2.1 | celox.io").assertIsDisplayed()
+        composeRule.onNodeWithText("v1.3.0 | celox.io").assertIsDisplayed()
     }
 
     @Test

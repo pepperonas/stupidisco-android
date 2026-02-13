@@ -26,12 +26,25 @@ class DeepgramClient(
         private const val DEEPGRAM_URL =
             "wss://api.deepgram.com/v1/listen?" +
             "model=nova-3&" +
-            "language=de&" +
+            "language=multi&" +
             "encoding=linear16&" +
             "sample_rate=16000&" +
             "channels=1&" +
             "interim_results=true&" +
-            "smart_format=true"
+            "smart_format=true&" +
+            "endpointing=100&" +
+            "keyterms=React&keyterms=Angular&keyterms=Vue&" +
+            "keyterms=TypeScript&keyterms=JavaScript&keyterms=Node.js&" +
+            "keyterms=Kotlin&keyterms=Swift&keyterms=Kubernetes&" +
+            "keyterms=Docker&keyterms=CI/CD&keyterms=REST&keyterms=GraphQL&" +
+            "keyterms=API&keyterms=Microservices&keyterms=Git&" +
+            "keyterms=Spring Boot&keyterms=PostgreSQL&keyterms=MongoDB&" +
+            "keyterms=Redis&keyterms=AWS&keyterms=Azure&keyterms=Terraform&" +
+            "keyterms=Jetpack Compose&keyterms=SwiftUI&keyterms=Flutter&" +
+            "keyterms=Python&keyterms=Java&keyterms=Rust&keyterms=Go&" +
+            "keyterms=Machine Learning&keyterms=Deep Learning&" +
+            "keyterms=Agile&keyterms=Scrum&keyterms=DevOps&" +
+            "keyterms=Clean Architecture&keyterms=SOLID&keyterms=Design Patterns"
     }
 
     private var webSocket: WebSocket? = null
