@@ -99,7 +99,9 @@ class OverlayContentTest {
     fun showsAnswer_whenPresent() {
         setContent(AppState(answer = "Kotlin ist eine Sprache.", status = AppStatus.Ready))
         composeRule.onNodeWithText("ANSWER").assertIsDisplayed()
-        composeRule.onNodeWithText("Kotlin ist eine Sprache.").assertIsDisplayed()
+        // MarkdownText uses AndroidView internally, so text isn't in Compose test tree
+        // Verify answer section is visible via ANSWER header + action buttons
+        composeRule.onNodeWithContentDescription("Copy").assertIsDisplayed()
     }
 
     @Test
