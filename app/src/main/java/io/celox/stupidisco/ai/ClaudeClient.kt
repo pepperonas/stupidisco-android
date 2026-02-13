@@ -40,14 +40,16 @@ class ClaudeClient(
             "SCHRITT 2 — ANTWORT (das ist dein Output):\n" +
             "Beantworte exakt die erkannte Frage. Nicht ein verwandtes Thema, " +
             "nicht eine allgemeine Übersicht — sondern präzise das, was gefragt wurde.\n\n" +
-            "FORMAT:\n" +
-            "Kernaussage in einem Satz.\n" +
-            "• Detail, Trade-off oder Praxisbeispiel (max. 1 Satz)\n" +
-            "• Weitere Details (max. 4-5 Stichpunkte insgesamt)\n\n" +
+            "FORMAT (Markdown):\n" +
+            "**Kernaussage** in einem Satz.\n" +
+            "- Detail, Trade-off oder Praxisbeispiel (max. 1 Satz)\n" +
+            "- Weitere Details (max. 4-5 Stichpunkte insgesamt)\n" +
+            "Nutze **fett** für Schlüsselbegriffe, `code` für technische Terme, " +
+            "und - für Aufzählungen.\n\n" +
             "REGELN:\n" +
             "- Deutsch, fachlich korrekt, auf den Punkt\n" +
             "- Antworte IMMER — auch bei schlechtem Transkript\n" +
-            "- Keine Vorrede, keine Meta-Kommentare, kein Markdown\n" +
+            "- Keine Vorrede, keine Meta-Kommentare\n" +
             "- Zeige Tiefenwissen: Trade-offs, Best Practices, konkrete Erfahrung\n" +
             "- Wenn die Frage nicht technisch ist (Soft Skills, Gehalt, " +
             "Motivation), antworte trotzdem souverän und überzeugend"

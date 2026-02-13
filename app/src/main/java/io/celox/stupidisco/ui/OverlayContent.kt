@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.jeziellago.compose.markdowntext.MarkdownText
 import io.celox.stupidisco.R
 import io.celox.stupidisco.model.AppState
 import io.celox.stupidisco.model.AppStatus
@@ -325,11 +326,13 @@ private fun AnswerArea(answer: String, isThinking: Boolean, heightDp: Int) {
                 fontFamily = FontFamily.Monospace
             )
         } else {
-            Text(
-                text = answer,
-                fontSize = 13.sp,
-                color = AppColors.Answer,
-                lineHeight = 18.sp
+            MarkdownText(
+                markdown = answer,
+                style = androidx.compose.ui.text.TextStyle(
+                    color = AppColors.Answer,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
             )
         }
     }
